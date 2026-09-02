@@ -1,10 +1,14 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Management;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Windows.Media.Imaging;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
@@ -54,178 +58,316 @@ namespace MazliBoost
 
         private string currentLanguage = "English";
 
-        private readonly Dictionary<string, Dictionary<string, string>>
-            translations =
-            new Dictionary<string, Dictionary<string, string>>(
-                StringComparer.OrdinalIgnoreCase)
+        private readonly string[] supportedLanguages =
+        {
+            "English",
+            "Magyar",
+            "Deutsch",
+            "Español",
+            "Français",
+            "Italiano",
+            "Português"
+        };
+
+        private Dictionary<string, string> currentTranslations =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // =========================================================
+        // SETTINGS
+        // =========================================================
+
+        private AppSettings settings = new AppSettings();
+        private bool settingsChanged = false;
+        private bool loadingSettings = true;
+        private bool closingAfterDecision = false;
+
+        // =========================================================
+        // NATIVE MEMORY API
+        // =========================================================
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MEMORYSTATUSEX
+        {
+            public uint dwLength;
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys;
+            public ulong ullAvailPhys;
+            public ulong ullTotalPageFile;
+            public ulong ullAvailPageFile;
+            public ulong ullTotalVirtual;
+            public ulong ullAvailVirtual;
+            public ulong ullAvailExtendedVirtual;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GlobalMemoryStatusEx(
+            ref MEMORYSTATUSEX lpBuffer);
+
+        // =========================================================
+        // PROCESS POWER THROTTLING
+        // =========================================================
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PROCESS_POWER_THROTTLING_STATE
+        {
+            public uint Version;
+            public uint ControlMask;
+            public uint StateMask;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetProcessInformation(
+            IntPtr hProcess,
+            int ProcessInformationClass,
+            ref PROCESS_POWER_THROTTLING_STATE ProcessInformation,
+            uint ProcessInformationSize);
+
+        private const int ProcessPowerThrottling = 4;
+        private const uint ProcessPowerThrottlingExecutionSpeed = 0x1;
+
+        // =========================================================
+        // LOCALIZATION
+        // =========================================================
+
+        private static readonly Dictionary<string, string> fallbackStrings =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                {
-                    "English",
-                    new Dictionary<string, string>
-                    {
-                        { "subtitle", "Windows Gaming Performance Utility" },
-                        { "languages", "Languages" },
-                        { "ready", "READY" },
-
-                        { "detectedGame", "DETECTED GAME" },
-                        { "noGame", "No game detected" },
-                        { "detectAgain", "DETECT AGAIN" },
-                        { "detectHint", "Start a game and detect it." },
-
-                        { "gamingOptimizations", "GAMING OPTIMIZATIONS" },
-                        { "choose", "Choose what MázliBoost should apply." },
-                        { "independent", "Each optimization can be enabled or disabled independently." },
-
-                        { "highPerformance", "High Performance Power Plan" },
-                        { "gameMode", "Windows Game Mode" },
-                        { "gameDvr", "Disable Game DVR / Background Capture" },
-                        { "gamePriority", "Optimize Game Process Priority" },
-                        { "memoryCleanup", "Background Memory Cleanup" },
-
-                        { "selected", "Selected" },
-                        { "apply", "APPLY SELECTED OPTIMIZATIONS" },
-                        { "moreTweaks", "MORE OPTIMIZATIONS & TWEAKS" },
-
-                        { "system", "SYSTEM" },
-                        { "currentHardware", "Current hardware" },
-                        { "memory", "MEMORY" },
-                        { "powerPlan", "POWER PLAN" },
-
-                        { "advanced", "ADVANCED" },
-                        { "future", "More tweaks available." },
-                        { "futureDescription", "Open More Optimizations & Tweaks to explore additional options." },
-
-                        { "statusReady", "Status: Ready" },
-                        { "statusDetecting", "Status: Detecting game..." },
-                        { "statusDetected", "Status: Game detected" },
-                        { "statusOptimizing", "Status: Applying selected optimizations..." },
-                        { "statusComplete", "Status: Optimization complete" },
-
-                        { "footer", "Performance without the snake oil." },
-
-                        { "nothingSelected", "Select at least one optimization." },
-                        { "optimizationComplete", "MázliBoost completed the selected optimizations." },
-                        { "noOptimization", "No optimization could be applied." },
-                        { "detected", "Detected game" },
-                        { "noDetected", "No game was detected." },
-
-                        { "tweaksTitle", "MORE OPTIMIZATIONS & TWEAKS" },
-                        { "tweaksSubtitle", "Additional Windows and gaming optimizations." },
-                        { "back", "←  BACK" },
-
-                        { "windowsTweaks", "WINDOWS" },
-                        { "gamingTweaks", "GAMING" },
-
-                        { "visualEffects", "Visual Effects to best performance" },
-                        { "visualEffectsDescription", "Changes Windows appearance - Revertable by unchecking." },
-
-                        { "transparency", "Disable Transparency Effects" },
-                        { "transparencyDescription", "Changes Windows appearance - Revertable by unchecking." },
-
-                        { "menuDelay", "Reduce Menu Show Delay" },
-                        { "menuDelayDescription", "Makes Windows menus appear faster - Revertable by unchecking." },
-
-                        { "mouseHover", "Reduce Mouse Hover Delay" },
-                        { "mouseHoverDescription", "Makes hover tooltips appear faster - Revertable by unchecking." },
-
-                        { "tweaksGameMode", "Windows Game Mode" },
-                        { "tweaksGameModeDescription", "Enables Windows Game Mode." },
-
-                        { "tweaksGameDvr", "Disable Game DVR / Background Capture" },
-                        { "tweaksGameDvrDescription", "Reduces background capture activity." },
-
-                        { "tweaksHighPerformance", "High Performance Power Plan" },
-                        { "tweaksHighPerformanceDescription", "Favors performance over power saving." },
-
-                        { "tweaksInfoTitle", "ABOUT THESE TWEAKS" },
-                        { "tweaksInfoText", "MázliBoost only applies the selected changes. Registry-based tweaks are used only where appropriate and are designed to be reversible." }
-                    }
-                },
-
-                {
-                    "Magyar",
-                    new Dictionary<string, string>
-                    {
-                        { "subtitle", "Windows Gaming teljesítményoptimalizáló" },
-                        { "languages", "Nyelvek" },
-                        { "ready", "KÉSZ" },
-
-                        { "detectedGame", "FELISMERT JÁTÉK" },
-                        { "noGame", "Nincs felismert játék" },
-                        { "detectAgain", "ÚJRA FELISMERÉS" },
-                        { "detectHint", "Indíts el egy játékot, majd indítsd újra a felismerést." },
-
-                        { "gamingOptimizations", "JÁTÉKOPTIMALIZÁLÁSOK" },
-                        { "choose", "Válaszd ki, mit alkalmazzon a MázliBoost." },
-                        { "independent", "Minden optimalizálás külön-külön be- vagy kikapcsolható." },
-
-                        { "highPerformance", "High Performance energiaellátási séma" },
-                        { "gameMode", "Windows Game Mode" },
-                        { "gameDvr", "Game DVR / háttérfelvétel kikapcsolása" },
-                        { "gamePriority", "Játékfolyamat prioritásának optimalizálása" },
-                        { "memoryCleanup", "Háttérmemória tisztítása" },
-
-                        { "selected", "Kiválasztva" },
-                        { "apply", "KIVÁLASZTOTTAK ALKALMAZÁSA" },
-                        { "moreTweaks", "TOVÁBBI OPTIMALIZÁLÁSOK ÉS TWEAKEK" },
-
-                        { "system", "RENDSZER" },
-                        { "currentHardware", "Jelenlegi hardver" },
-                        { "memory", "MEMÓRIA" },
-                        { "powerPlan", "ENERGIAELLÁTÁSI SÉMA" },
-
-                        { "advanced", "HALADÓ" },
-                        { "future", "További tweakek elérhetők." },
-                        { "futureDescription", "Nyisd meg a További optimalizálások és tweakek menüt további lehetőségekért." },
-
-                        { "statusReady", "Állapot: Kész" },
-                        { "statusDetecting", "Állapot: Játék felismerése..." },
-                        { "statusDetected", "Állapot: Játék felismerve" },
-                        { "statusOptimizing", "Állapot: Kiválasztott optimalizálások alkalmazása..." },
-                        { "statusComplete", "Állapot: Optimalizálás kész" },
-
-                        { "footer", "Teljesítmény sallangok nélkül." },
-
-                        { "nothingSelected", "Válassz ki legalább egy optimalizálást." },
-                        { "optimizationComplete", "A MázliBoost alkalmazta a kiválasztott optimalizálásokat." },
-                        { "noOptimization", "Egyetlen optimalizálást sem sikerült alkalmazni." },
-                        { "detected", "Felismert játék" },
-                        { "noDetected", "Nem sikerült játékot felismerni." },
-
-                        { "tweaksTitle", "TOVÁBBI OPTIMALIZÁLÁSOK ÉS TWEAKEK" },
-                        { "tweaksSubtitle", "További Windows- és játékoptimalizálások." },
-                        { "back", "←  VISSZA" },
-
-                        { "windowsTweaks", "WINDOWS" },
-                        { "gamingTweaks", "JÁTÉK" },
-
-                        { "visualEffects", "Vizuális effektek a legjobb teljesítményhez" },
-                        { "visualEffectsDescription", "Megváltoztatja a Windows megjelenését – a kikapcsolással visszaállítható." },
-
-                        { "transparency", "Átlátszósági effektek kikapcsolása" },
-                        { "transparencyDescription", "Megváltoztatja a Windows megjelenését – a kikapcsolással visszaállítható." },
-
-                        { "menuDelay", "Menük megjelenési idejének csökkentése" },
-                        { "menuDelayDescription", "Gyorsabban jelennek meg a Windows menüi – a kikapcsolással visszaállítható." },
-
-                        { "mouseHover", "Egér-hover késleltetés csökkentése" },
-                        { "mouseHoverDescription", "Gyorsabban jelennek meg a hover tippek – a kikapcsolással visszaállítható." },
-
-                        { "tweaksGameMode", "Windows Game Mode" },
-                        { "tweaksGameModeDescription", "Bekapcsolja a Windows Game Mode-ot." },
-
-                        { "tweaksGameDvr", "Game DVR / háttérfelvétel kikapcsolása" },
-                        { "tweaksGameDvrDescription", "Csökkenti a háttérben futó rögzítési tevékenységet." },
-
-                        { "tweaksHighPerformance", "High Performance energiaellátási séma" },
-                        { "tweaksHighPerformanceDescription", "A teljesítményt részesíti előnyben az energiatakarékossággal szemben." },
-
-                        { "tweaksInfoTitle", "A TWEAKEKRŐL" },
-                        { "tweaksInfoText", "A MázliBoost csak a kiválasztott módosításokat alkalmazza. A registry-alapú tweakeket csak ott használjuk, ahol indokoltak, és visszaállíthatóra tervezzük őket." }
-                    }
-                }
+                { "subtitle", "Windows Gaming Performance Utility" },
+                { "languages", "Languages" },
+                { "ready", "READY" },
+                { "detectedGame", "DETECTED GAME" },
+                { "noGame", "No game detected" },
+                { "detectAgain", "DETECT AGAIN" },
+                { "detectHint", "Start a game and detect it." },
+                { "gamingOptimizations", "GAMING OPTIMIZATIONS" },
+                { "choose", "Choose what MázliBoost should apply." },
+                { "independent", "Each optimization can be enabled or disabled independently." },
+                { "highPerformance", "High Performance Power Plan" },
+                { "gameMode", "Windows Game Mode" },
+                { "gameDvr", "Disable Game DVR / Background Capture" },
+                { "gamePriority", "Optimize Game Process Priority" },
+                { "memoryCleanup", "Background Memory Cleanup" },
+                { "gamePowerThrottling", "Disable Game Power Throttling" },
+                { "gameFullscreenOptimization", "Disable Fullscreen Optimizations (Detected Game)" },
+                { "selected", "Selected" },
+                { "apply", "APPLY SELECTED OPTIMIZATIONS" },
+                { "moreTweaks", "MORE OPTIMIZATIONS & TWEAKS" },
+                { "system", "SYSTEM" },
+                { "currentHardware", "Current hardware" },
+                { "memory", "MEMORY" },
+                { "powerPlan", "POWER PLAN" },
+                { "advanced", "ADVANCED" },
+                { "future", "More tweaks available." },
+                { "futureDescription", "Open More Optimizations & Tweaks to explore additional options." },
+                { "statusReady", "Status: Ready" },
+                { "statusDetecting", "Status: Detecting game..." },
+                { "statusDetected", "Status: Game detected" },
+                { "statusOptimizing", "Status: Applying selected optimizations..." },
+                { "statusComplete", "Status: Optimization complete" },
+                { "footer", "Performance without the snake oil." },
+                { "nothingSelected", "Select at least one optimization." },
+                { "optimizationComplete", "MázliBoost completed the selected optimizations." },
+                { "noOptimization", "No optimization could be applied." },
+                { "detected", "Detected game" },
+                { "noDetected", "No game was detected." },
+                { "tweaksTitle", "MORE OPTIMIZATIONS & TWEAKS" },
+                { "tweaksSubtitle", "Additional Windows and gaming optimizations." },
+                { "back", "←  BACK" },
+                { "windowsTweaks", "WINDOWS" },
+                { "gamingTweaks", "GAMING" },
+                { "visualEffects", "Visual Effects to best performance" },
+                { "visualEffectsDescription", "Changes Windows appearance - Revertable by unchecking." },
+                { "transparency", "Disable Transparency Effects" },
+                { "transparencyDescription", "Changes Windows appearance - Revertable by unchecking." },
+                { "menuDelay", "Reduce Menu Show Delay" },
+                { "menuDelayDescription", "Makes Windows menus appear faster - Revertable by unchecking." },
+                { "mouseHover", "Reduce Mouse Hover Delay" },
+                { "mouseHoverDescription", "Makes hover tooltips appear faster - Revertable by unchecking." },
+                { "tweaksGameMode", "Windows Game Mode" },
+                { "tweaksGameModeDescription", "Enables Windows Game Mode." },
+                { "tweaksGameDvr", "Disable Game DVR / Background Capture" },
+                { "tweaksGameDvrDescription", "Reduces background capture activity." },
+                { "tweaksHighPerformance", "High Performance Power Plan" },
+                { "tweaksHighPerformanceDescription", "Favors performance over power saving." },
+                { "startupDelay", "Disable Windows Startup Delay" },
+                { "startupDelayDescription", "Reduces the delay before desktop applications start." },
+                { "windowAnimations", "Disable Window Animations" },
+                { "windowAnimationsDescription", "Changes Windows appearance - Revertable by unchecking." },
+                { "taskbarAnimations", "Disable Taskbar Animations" },
+                { "taskbarAnimationsDescription", "Changes Windows appearance - Revertable by unchecking." },
+                { "explorerThumbnails", "Disable Explorer Thumbnail Previews" },
+                { "explorerThumbnailsDescription", "Changes Windows appearance - Revertable by unchecking." },
+                { "tweaksInfoTitle", "ABOUT THESE TWEAKS" },
+                { "tweaksInfoText", "MázliBoost only applies the selected changes. Registry-based tweaks are used only where appropriate and are designed to be reversible." },
+                { "saveChangesTitle", "Save changes?" },
+                { "saveChangesMessage", "Would you like to save the changes?" },
+                { "saveAndClose", "Yes and close" },
+                { "discardAndClose", "Discard and close" },
+                { "settingsSaveFailed", "MázliBoost could not save settings.json. Check that the application folder is writable." },
+                { "error", "Error" }
             };
 
+        private void LoadLanguage(string language)
+        {
+            if (string.IsNullOrWhiteSpace(language))
+                language = "English";
+
+            try
+            {
+                string resourceName =
+                    "MazliBoost.Langs." + GetLanguageCode(language) + ".json";
+
+                using Stream stream =
+                    typeof(MainWindow).Assembly.GetManifestResourceStream(resourceName);
+
+                if (stream != null)
+                {
+                    Dictionary<string, string> loaded =
+                        JsonSerializer.Deserialize<Dictionary<string, string>>(stream)
+                        ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                    currentTranslations =
+                        new Dictionary<string, string>(loaded, StringComparer.OrdinalIgnoreCase);
+
+                    currentLanguage = language;
+                    return;
+                }
+            }
+            catch
+            {
+            }
+
+            currentLanguage = "English";
+            currentTranslations =
+                new Dictionary<string, string>(fallbackStrings, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private string GetLanguageCode(string language)
+        {
+            return language switch
+            {
+                "English" => "en",
+                "Magyar" => "hu",
+                "Deutsch" => "de",
+                "Español" => "es",
+                "Français" => "fr",
+                "Italiano" => "it",
+                "Português" => "pt",
+                _ => "en"
+            };
+        }
+
+        private string T(string key)
+        {
+            string value;
+
+            if (currentTranslations.TryGetValue(key, out value))
+                return value;
+
+            if (fallbackStrings.TryGetValue(key, out value))
+                return value;
+
+            return key;
+        }
+
+        private void ApplyLocalization()
+        {
+            if (ReadyText == null ||
+                AppSubtitleText == null ||
+                LanguageLabelText == null ||
+                DetectButton == null)
+            {
+                return;
+            }
+
+            AppSubtitleText.Text = T("subtitle");
+            LanguageLabelText.Text = T("languages");
+            ReadyText.Text = T("ready");
+
+            DetectedGameLabelText.Text = T("detectedGame");
+            DetectButton.Content = T("detectAgain");
+
+            GamingOptimizationsLabelText.Text = T("gamingOptimizations");
+            ChooseText.Text = T("choose");
+            IndependentText.Text = T("independent");
+
+            HighPerformanceCheck.Content = T("highPerformance");
+            GameModeCheck.Content = T("gameMode");
+            GameDvrCheck.Content = T("gameDvr");
+            GamePriorityCheck.Content = T("gamePriority");
+            MemoryCleanupCheck.Content = T("memoryCleanup");
+            GamePowerThrottlingCheck.Content = T("gamePowerThrottling");
+            GameFullscreenOptimizationCheck.Content = T("gameFullscreenOptimization");
+
+            BoostButton.Content = T("apply");
+            MoreTweaksButton.Content = T("moreTweaks");
+
+            SystemLabelText.Text = T("system");
+            CurrentHardwareText.Text = T("currentHardware");
+            MemoryLabelText.Text = T("memory");
+            PowerPlanLabelText.Text = T("powerPlan");
+
+            AdvancedLabelText.Text = T("advanced");
+            FutureText.Text = T("future");
+            FutureDescriptionText.Text = T("futureDescription");
+            FooterText.Text = T("footer");
+
+            TweaksTitleText.Text = T("tweaksTitle");
+            TweaksSubtitleText.Text = T("tweaksSubtitle");
+            BackButton.Content = T("back");
+            WindowsTweaksHeader.Text = T("windowsTweaks");
+            GamingTweaksHeader.Text = T("gamingTweaks");
+
+            VisualEffectsCheck.Content = T("visualEffects");
+            VisualEffectsDescription.Text = T("visualEffectsDescription");
+            TransparencyCheck.Content = T("transparency");
+            TransparencyDescription.Text = T("transparencyDescription");
+            MenuDelayCheck.Content = T("menuDelay");
+            MenuDelayDescription.Text = T("menuDelayDescription");
+            MouseHoverCheck.Content = T("mouseHover");
+            MouseHoverDescription.Text = T("mouseHoverDescription");
+            TweaksGameModeCheck.Content = T("tweaksGameMode");
+            TweaksGameModeDescription.Text = T("tweaksGameModeDescription");
+            TweaksGameDvrCheck.Content = T("tweaksGameDvr");
+            TweaksGameDvrDescription.Text = T("tweaksGameDvrDescription");
+            TweaksHighPerformanceCheck.Content = T("tweaksHighPerformance");
+            TweaksHighPerformanceDescription.Text = T("tweaksHighPerformanceDescription");
+            StartupDelayCheck.Content = T("startupDelay");
+            StartupDelayDescription.Text = T("startupDelayDescription");
+            WindowAnimationsCheck.Content = T("windowAnimations");
+            WindowAnimationsDescription.Text = T("windowAnimationsDescription");
+            TaskbarAnimationsCheck.Content = T("taskbarAnimations");
+            TaskbarAnimationsDescription.Text = T("taskbarAnimationsDescription");
+            ExplorerThumbnailsCheck.Content = T("explorerThumbnails");
+            ExplorerThumbnailsDescription.Text = T("explorerThumbnailsDescription");
+            TweaksInfoTitle.Text = T("tweaksInfoTitle");
+            TweaksInfoText.Text = T("tweaksInfoText");
+
+            UpdateGameUI();
+            UpdateSelectionCounter();
+
+            if (detectedGamePid <= 0)
+                StatusText.Text = T("statusReady");
+        }
+
+        private void LanguageComboBox_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e)
+        {
+            if (LanguageComboBox == null || ReadyText == null)
+                return;
+
+            int index = LanguageComboBox.SelectedIndex;
+
+            if (index < 0 || index >= supportedLanguages.Length)
+                return;
+
+            LoadLanguage(supportedLanguages[index]);
+            currentLanguage = supportedLanguages[index];
+            settings.Language = currentLanguage;
+            MarkSettingsChanged();
+            ApplyLocalization();
+        }
 
         // =========================================================
         // REGISTRY BACKUP
@@ -249,12 +391,143 @@ namespace MazliBoost
         private string previousPowerPlanGuid = null;
 
         // =========================================================
+        // SETTINGS
+        // =========================================================
+
+        private void LoadSettings()
+        {
+            settings = SettingsLoader.Load();
+
+            currentLanguage = supportedLanguages
+                .FirstOrDefault(x => string.Equals(x, settings.Language, StringComparison.OrdinalIgnoreCase))
+                ?? "English";
+
+            int languageIndex = Array.IndexOf(supportedLanguages, currentLanguage);
+            if (languageIndex < 0)
+                languageIndex = 0;
+
+            LanguageComboBox.SelectedIndex = languageIndex;
+
+            HighPerformanceCheck.IsChecked = settings.MainOptimizations.HighPerformance;
+            GameModeCheck.IsChecked = settings.MainOptimizations.GameMode;
+            GameDvrCheck.IsChecked = settings.MainOptimizations.GameDvr;
+            GamePriorityCheck.IsChecked = settings.MainOptimizations.GamePriority;
+            MemoryCleanupCheck.IsChecked = settings.MainOptimizations.MemoryCleanup;
+            GamePowerThrottlingCheck.IsChecked = settings.MainOptimizations.GamePowerThrottling;
+            GameFullscreenOptimizationCheck.IsChecked = settings.MainOptimizations.FullscreenOptimization;
+
+            VisualEffectsCheck.IsChecked = settings.MoreTweaks.VisualEffects;
+            TransparencyCheck.IsChecked = settings.MoreTweaks.Transparency;
+            MenuDelayCheck.IsChecked = settings.MoreTweaks.MenuDelay;
+            MouseHoverCheck.IsChecked = settings.MoreTweaks.MouseHover;
+            TweaksGameModeCheck.IsChecked = settings.MoreTweaks.GameMode;
+            TweaksGameDvrCheck.IsChecked = settings.MoreTweaks.GameDvr;
+            TweaksHighPerformanceCheck.IsChecked = settings.MoreTweaks.HighPerformance;
+            StartupDelayCheck.IsChecked = settings.MoreTweaks.StartupDelay;
+            WindowAnimationsCheck.IsChecked = settings.MoreTweaks.WindowAnimations;
+            TaskbarAnimationsCheck.IsChecked = settings.MoreTweaks.TaskbarAnimations;
+            ExplorerThumbnailsCheck.IsChecked = settings.MoreTweaks.ExplorerThumbnails;
+
+            settingsChanged = false;
+        }
+
+        private void CaptureSettingsFromUi()
+        {
+            settings.Language = currentLanguage;
+
+            settings.MainOptimizations.HighPerformance = HighPerformanceCheck.IsChecked == true;
+            settings.MainOptimizations.GameMode = GameModeCheck.IsChecked == true;
+            settings.MainOptimizations.GameDvr = GameDvrCheck.IsChecked == true;
+            settings.MainOptimizations.GamePriority = GamePriorityCheck.IsChecked == true;
+            settings.MainOptimizations.MemoryCleanup = MemoryCleanupCheck.IsChecked == true;
+            settings.MainOptimizations.GamePowerThrottling = GamePowerThrottlingCheck.IsChecked == true;
+            settings.MainOptimizations.FullscreenOptimization = GameFullscreenOptimizationCheck.IsChecked == true;
+
+            settings.MoreTweaks.VisualEffects = VisualEffectsCheck.IsChecked == true;
+            settings.MoreTweaks.Transparency = TransparencyCheck.IsChecked == true;
+            settings.MoreTweaks.MenuDelay = MenuDelayCheck.IsChecked == true;
+            settings.MoreTweaks.MouseHover = MouseHoverCheck.IsChecked == true;
+            settings.MoreTweaks.GameMode = TweaksGameModeCheck.IsChecked == true;
+            settings.MoreTweaks.GameDvr = TweaksGameDvrCheck.IsChecked == true;
+            settings.MoreTweaks.HighPerformance = TweaksHighPerformanceCheck.IsChecked == true;
+            settings.MoreTweaks.StartupDelay = StartupDelayCheck.IsChecked == true;
+            settings.MoreTweaks.WindowAnimations = WindowAnimationsCheck.IsChecked == true;
+            settings.MoreTweaks.TaskbarAnimations = TaskbarAnimationsCheck.IsChecked == true;
+            settings.MoreTweaks.ExplorerThumbnails = ExplorerThumbnailsCheck.IsChecked == true;
+        }
+
+        private void MarkSettingsChanged()
+        {
+            if (!loadingSettings)
+                settingsChanged = true;
+        }
+
+        private void MainWindow_Closing(
+    object sender,
+    System.ComponentModel.CancelEventArgs e)
+        {
+            if (closingAfterDecision || !settingsChanged)
+                return;
+
+            e.Cancel = true;
+
+            SaveChangesWindow dialog = new SaveChangesWindow(
+                T("saveChangesTitle"),
+                T("saveChangesMessage"),
+                T("saveAndClose"),
+                T("discardAndClose"))
+            {
+                Owner = this
+            };
+
+            bool? result = dialog.ShowDialog();
+
+            if (result == true)
+            {
+                CaptureSettingsFromUi();
+
+                if (!SettingsLoader.Save(settings))
+                {
+                    MessageBox.Show(
+                        T("settingsSaveFailed"),
+                        T("error"),
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+
+                    return;
+                }
+            }
+            else if (result == false)
+            {
+                // Discard: nem mentjük a módosításokat.
+            }
+            else
+            {
+                return;
+            }
+
+            // Most már nincs szükség újabb mentési kérdésre.
+            settingsChanged = false;
+            closingAfterDecision = true;
+
+            // A jelenlegi Closing esemény befejezése után zárjuk be az ablakot.
+            Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Background,
+                new Action(Close));
+        }
+
+        // =========================================================
         // CONSTRUCTOR
         // =========================================================
 
         public MainWindow()
         {
             InitializeComponent();
+
+            LoadScaledSplashImages();
+            LoadLanguage("English");
+            LoadSettings();
+            loadingSettings = false;
 
             LoadSystemInfo();
             DetectGame();
@@ -264,173 +537,6 @@ namespace MazliBoost
             MainContent.Opacity = 0;
 
             StartSplashAnimation();
-        }
-
-        // =========================================================
-        // LOCALIZATION
-        // =========================================================
-
-        private string T(string key)
-        {
-            Dictionary<string, string> language;
-
-            if (translations.TryGetValue(
-                    currentLanguage,
-                    out language))
-            {
-                string value;
-
-                if (language.TryGetValue(
-                        key,
-                        out value))
-                {
-                    return value;
-                }
-            }
-
-            return key;
-        }
-
-        private void ApplyLocalization()
-        {
-            AppSubtitleText.Text = T("subtitle");
-            LanguageLabelText.Text = T("languages");
-            ReadyText.Text = T("ready");
-
-            DetectedGameLabelText.Text = T("detectedGame");
-            DetectButton.Content = T("detectAgain");
-
-            GamingOptimizationsLabelText.Text =
-                T("gamingOptimizations");
-
-            ChooseText.Text = T("choose");
-            IndependentText.Text = T("independent");
-
-            HighPerformanceCheck.Content =
-                T("highPerformance");
-
-            GameModeCheck.Content =
-                T("gameMode");
-
-            GameDvrCheck.Content =
-                T("gameDvr");
-
-            GamePriorityCheck.Content =
-                T("gamePriority");
-
-            MemoryCleanupCheck.Content =
-                T("memoryCleanup");
-
-            BoostButton.Content = T("apply");
-            MoreTweaksButton.Content = T("moreTweaks");
-
-            SystemLabelText.Text = T("system");
-            CurrentHardwareText.Text =
-                T("currentHardware");
-
-            MemoryLabelText.Text = T("memory");
-            PowerPlanLabelText.Text = T("powerPlan");
-
-            AdvancedLabelText.Text = T("advanced");
-            FutureText.Text = T("future");
-            FutureDescriptionText.Text =
-                T("futureDescription");
-
-            FooterText.Text = T("footer");
-
-            TweaksTitleText.Text = T("tweaksTitle");
-            TweaksSubtitleText.Text = T("tweaksSubtitle");
-            BackButton.Content = T("back");
-
-            WindowsTweaksHeader.Text =
-                T("windowsTweaks");
-
-            GamingTweaksHeader.Text =
-                T("gamingTweaks");
-
-            VisualEffectsCheck.Content =
-                T("visualEffects");
-
-            VisualEffectsDescription.Text =
-                T("visualEffectsDescription");
-
-            TransparencyCheck.Content =
-                T("transparency");
-
-            TransparencyDescription.Text =
-                T("transparencyDescription");
-
-            MenuDelayCheck.Content =
-                T("menuDelay");
-
-            MenuDelayDescription.Text =
-                T("menuDelayDescription");
-
-            MouseHoverCheck.Content =
-                T("mouseHover");
-
-            MouseHoverDescription.Text =
-                T("mouseHoverDescription");
-
-            TweaksGameModeCheck.Content =
-                T("tweaksGameMode");
-
-            TweaksGameModeDescription.Text =
-                T("tweaksGameModeDescription");
-
-            TweaksGameDvrCheck.Content =
-                T("tweaksGameDvr");
-
-            TweaksGameDvrDescription.Text =
-                T("tweaksGameDvrDescription");
-
-            TweaksHighPerformanceCheck.Content =
-                T("tweaksHighPerformance");
-
-            TweaksHighPerformanceDescription.Text =
-                T("tweaksHighPerformanceDescription");
-
-            TweaksInfoTitle.Text =
-                T("tweaksInfoTitle");
-
-            TweaksInfoText.Text =
-                T("tweaksInfoText");
-
-            UpdateGameUI();
-            UpdateSelectionCounter();
-
-            if (detectedGamePid <= 0)
-            {
-                StatusText.Text = T("statusReady");
-            }
-        }
-
-        private void LanguageComboBox_SelectionChanged(
-    object sender,
-    SelectionChangedEventArgs e)
-        {
-            // WPF can fire SelectionChanged while InitializeComponent()
-            // is still constructing the window.
-            if (LanguageComboBox == null ||
-                ReadyText == null)
-            {
-                return;
-            }
-
-            if (LanguageComboBox.SelectedIndex == 0)
-            {
-                currentLanguage = "English";
-            }
-            else if (LanguageComboBox.SelectedIndex == 1)
-            {
-                currentLanguage = "Magyar";
-            }
-            else
-            {
-                return;
-            }
-
-            ApplyLocalization();
         }
 
         // =========================================================
@@ -623,56 +729,18 @@ namespace MazliBoost
         {
             try
             {
-                using (ManagementObjectSearcher searcher =
-                    new ManagementObjectSearcher(
-                        "SELECT CommandLine " +
-                        "FROM Win32_Process " +
-                        "WHERE ProcessId = " + pid))
-                {
-                    foreach (ManagementObject obj
-                             in searcher.Get())
-                    {
-                        string commandLine =
-                            obj["CommandLine"] != null
-                                ? obj["CommandLine"].ToString()
-                                : "";
-
-                        string lower =
-                            commandLine.ToLowerInvariant();
-
-                        if (lower.Contains("minecraft"))
-                            return true;
-
-                        if (lower.Contains("fabric-loader"))
-                            return true;
-
-                        if (lower.Contains(
-                            "net.fabricmc.loader"))
-                            return true;
-
-                        if (lower.Contains("quilt-loader"))
-                            return true;
-
-                        if (lower.Contains("lwjgl"))
-                            return true;
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            try
-            {
                 using Process process =
                     Process.GetProcessById(pid);
 
                 string title =
                     process.MainWindowTitle ?? "";
 
-                if (title.ToLowerInvariant()
-                        .Contains("minecraft"))
+                if (title.Contains(
+                        "Minecraft",
+                        StringComparison.OrdinalIgnoreCase))
+                {
                     return true;
+                }
             }
             catch
             {
@@ -852,6 +920,7 @@ namespace MazliBoost
             RoutedEventArgs e)
         {
             UpdateSelectionCounter();
+            MarkSettingsChanged();
         }
 
         private void UpdateSelectionCounter()
@@ -861,14 +930,16 @@ namespace MazliBoost
                 GameModeCheck == null ||
                 GameDvrCheck == null ||
                 GamePriorityCheck == null ||
-                MemoryCleanupCheck == null)
+                MemoryCleanupCheck == null ||
+                GamePowerThrottlingCheck == null ||
+                GameFullscreenOptimizationCheck == null)
             {
                 return;
             }
 
             int selected = 0;
 
-            const int total = 5;
+            const int total = 7;
 
             if (HighPerformanceCheck.IsChecked == true)
                 selected++;
@@ -883,6 +954,12 @@ namespace MazliBoost
                 selected++;
 
             if (MemoryCleanupCheck.IsChecked == true)
+                selected++;
+
+            if (GamePowerThrottlingCheck.IsChecked == true)
+                selected++;
+
+            if (GameFullscreenOptimizationCheck.IsChecked == true)
                 selected++;
 
             SelectedCountText.Text =
@@ -908,7 +985,9 @@ namespace MazliBoost
                 GameModeCheck.IsChecked == true ||
                 GameDvrCheck.IsChecked == true ||
                 GamePriorityCheck.IsChecked == true ||
-                MemoryCleanupCheck.IsChecked == true;
+                MemoryCleanupCheck.IsChecked == true ||
+                GamePowerThrottlingCheck.IsChecked == true ||
+                GameFullscreenOptimizationCheck.IsChecked == true;
 
             if (!anythingSelected)
             {
@@ -970,6 +1049,26 @@ namespace MazliBoost
                 {
                     completed.Add(
                         T("memoryCleanup"));
+                }
+
+                if (GamePowerThrottlingCheck.IsChecked == true &&
+                    detectedGamePid > 0)
+                {
+                    if (SetGamePowerThrottling(detectedGamePid, true))
+                    {
+                        completed.Add(
+                            T("gamePowerThrottling"));
+                    }
+                }
+
+                if (GameFullscreenOptimizationCheck.IsChecked == true &&
+                    detectedGamePid > 0)
+                {
+                    if (SetGameFullscreenOptimization(detectedGamePid, true))
+                    {
+                        completed.Add(
+                            T("gameFullscreenOptimization"));
+                    }
                 }
 
                 LoadSystemInfo();
@@ -1243,6 +1342,79 @@ namespace MazliBoost
         }
 
         // =========================================================
+        // GAME POWER THROTTLING
+        // =========================================================
+
+        private bool SetGamePowerThrottling(int pid, bool disableThrottling)
+        {
+            try
+            {
+                using Process process = Process.GetProcessById(pid);
+
+                PROCESS_POWER_THROTTLING_STATE state =
+                    new PROCESS_POWER_THROTTLING_STATE
+                    {
+                        Version = 1,
+                        ControlMask = disableThrottling
+                            ? ProcessPowerThrottlingExecutionSpeed
+                            : 0,
+                        StateMask = 0
+                    };
+
+                return SetProcessInformation(
+                    process.Handle,
+                    ProcessPowerThrottling,
+                    ref state,
+                    (uint)Marshal.SizeOf<PROCESS_POWER_THROTTLING_STATE>());
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // =========================================================
+        // FULLSCREEN OPTIMIZATION
+        // =========================================================
+
+        private bool SetGameFullscreenOptimization(int pid, bool disable)
+        {
+            try
+            {
+                using Process process = Process.GetProcessById(pid);
+                string exePath = process.MainModule?.FileName;
+
+                if (string.IsNullOrWhiteSpace(exePath))
+                    return false;
+
+                const string path =
+                    @"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers";
+
+                if (disable)
+                {
+                    SaveRegistryValue(path, exePath);
+
+                    using RegistryKey key =
+                        Registry.CurrentUser.CreateSubKey(path);
+
+                    key?.SetValue(
+                        exePath,
+                        "~ DISABLEDXMAXIMIZEDWINDOWEDMODE",
+                        RegistryValueKind.String);
+
+                    return key != null;
+                }
+
+                RestoreRegistryValue(path, exePath);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // =========================================================
         // SYSTEM INFO
         // =========================================================
 
@@ -1285,24 +1457,20 @@ namespace MazliBoost
 
         private string GetCpuName()
         {
-            using (ManagementObjectSearcher searcher =
-                new ManagementObjectSearcher(
-                    "SELECT Name FROM Win32_Processor"))
+            try
             {
-                foreach (ManagementObject obj
-                         in searcher.Get())
-                {
-                    string name =
-                        obj["Name"] != null
-                            ? obj["Name"].ToString().Trim()
-                            : "";
+                using RegistryKey key =
+                    Registry.LocalMachine.OpenSubKey(
+                        @"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
 
-                    if (!string.IsNullOrWhiteSpace(
-                            name))
-                    {
-                        return name;
-                    }
-                }
+                string name =
+                    key?.GetValue("ProcessorNameString") as string;
+
+                if (!string.IsNullOrWhiteSpace(name))
+                    return name.Trim();
+            }
+            catch
+            {
             }
 
             return "Unknown CPU";
@@ -1310,25 +1478,18 @@ namespace MazliBoost
 
         private double GetRamGB()
         {
-            using (ManagementObjectSearcher searcher =
-                new ManagementObjectSearcher(
-                    "SELECT TotalVisibleMemorySize " +
-                    "FROM Win32_OperatingSystem"))
+            MEMORYSTATUSEX memory = new MEMORYSTATUSEX
             {
-                foreach (ManagementObject obj
-                         in searcher.Get())
-                {
-                    double kb =
-                        Convert.ToDouble(
-                            obj["TotalVisibleMemorySize"]);
+                dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>()
+            };
 
-                    return kb /
-                           1024.0 /
-                           1024.0;
-                }
-            }
+            if (!GlobalMemoryStatusEx(ref memory))
+                return 0;
 
-            return 0;
+            return memory.ullTotalPhys /
+                   1024.0 /
+                   1024.0 /
+                   1024.0;
         }
 
         private string GetPowerPlan()
@@ -1526,6 +1687,7 @@ namespace MazliBoost
             object sender,
             RoutedEventArgs e)
         {
+            MarkSettingsChanged();
             if (VisualEffectsCheck == null)
                 return;
 
@@ -1573,6 +1735,7 @@ namespace MazliBoost
             object sender,
             RoutedEventArgs e)
         {
+            MarkSettingsChanged();
             if (TransparencyCheck == null)
                 return;
 
@@ -1620,6 +1783,7 @@ namespace MazliBoost
             object sender,
             RoutedEventArgs e)
         {
+            MarkSettingsChanged();
             if (MenuDelayCheck == null)
                 return;
 
@@ -1667,6 +1831,7 @@ namespace MazliBoost
             object sender,
             RoutedEventArgs e)
         {
+            MarkSettingsChanged();
             if (MouseHoverCheck == null)
                 return;
 
@@ -1714,6 +1879,7 @@ namespace MazliBoost
             object sender,
             RoutedEventArgs e)
         {
+            MarkSettingsChanged();
             if (TweaksGameModeCheck == null)
                 return;
 
@@ -1737,6 +1903,7 @@ namespace MazliBoost
             object sender,
             RoutedEventArgs e)
         {
+            MarkSettingsChanged();
             if (TweaksGameDvrCheck == null)
                 return;
 
@@ -1754,6 +1921,7 @@ namespace MazliBoost
             object sender,
             RoutedEventArgs e)
         {
+            MarkSettingsChanged();
             if (TweaksHighPerformanceCheck == null)
                 return;
 
@@ -1765,6 +1933,142 @@ namespace MazliBoost
             {
                 RestorePreviousPowerPlan();
                 LoadSystemInfo();
+            }
+        }
+
+        // =========================================================
+        // STARTUP DELAY
+        // =========================================================
+
+        private void StartupDelayCheck_Changed(
+            object sender,
+            RoutedEventArgs e)
+        {
+            MarkSettingsChanged();
+            if (StartupDelayCheck == null)
+                return;
+
+            const string path =
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize";
+            const string name = "StartupDelayInMSec";
+
+            try
+            {
+                if (StartupDelayCheck.IsChecked == true)
+                {
+                    SaveRegistryValue(path, name);
+                    using RegistryKey key = Registry.CurrentUser.CreateSubKey(path);
+                    key?.SetValue(name, 0, RegistryValueKind.DWord);
+                }
+                else
+                {
+                    RestoreRegistryValue(path, name);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        // =========================================================
+        // WINDOW ANIMATIONS
+        // =========================================================
+
+        private void WindowAnimationsCheck_Changed(
+            object sender,
+            RoutedEventArgs e)
+        {
+            MarkSettingsChanged();
+            if (WindowAnimationsCheck == null)
+                return;
+
+            const string path =
+                @"Control Panel\Desktop\WindowMetrics";
+            const string name = "MinAnimate";
+
+            try
+            {
+                if (WindowAnimationsCheck.IsChecked == true)
+                {
+                    SaveRegistryValue(path, name);
+                    using RegistryKey key = Registry.CurrentUser.CreateSubKey(path);
+                    key?.SetValue(name, "0", RegistryValueKind.String);
+                }
+                else
+                {
+                    RestoreRegistryValue(path, name);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        // =========================================================
+        // TASKBAR ANIMATIONS
+        // =========================================================
+
+        private void TaskbarAnimationsCheck_Changed(
+            object sender,
+            RoutedEventArgs e)
+        {
+            MarkSettingsChanged();
+            if (TaskbarAnimationsCheck == null)
+                return;
+
+            const string path =
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
+            const string name = "TaskbarAnimations";
+
+            try
+            {
+                if (TaskbarAnimationsCheck.IsChecked == true)
+                {
+                    SaveRegistryValue(path, name);
+                    using RegistryKey key = Registry.CurrentUser.CreateSubKey(path);
+                    key?.SetValue(name, 0, RegistryValueKind.DWord);
+                }
+                else
+                {
+                    RestoreRegistryValue(path, name);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        // =========================================================
+        // EXPLORER THUMBNAILS
+        // =========================================================
+
+        private void ExplorerThumbnailsCheck_Changed(
+            object sender,
+            RoutedEventArgs e)
+        {
+            MarkSettingsChanged();
+            if (ExplorerThumbnailsCheck == null)
+                return;
+
+            const string path =
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
+            const string name = "DisableThumbnails";
+
+            try
+            {
+                if (ExplorerThumbnailsCheck.IsChecked == true)
+                {
+                    SaveRegistryValue(path, name);
+                    using RegistryKey key = Registry.CurrentUser.CreateSubKey(path);
+                    key?.SetValue(name, 1, RegistryValueKind.DWord);
+                }
+                else
+                {
+                    RestoreRegistryValue(path, name);
+                }
+            }
+            catch
+            {
             }
         }
 
@@ -1818,6 +2122,46 @@ namespace MazliBoost
                 "MázliBoost",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
+        }
+
+        // =========================================================
+        // SPLASH IMAGE MEMORY OPTIMIZATION
+        // =========================================================
+
+        private void LoadScaledSplashImages()
+        {
+            ConfigureSplashImage(
+                EngineSplashImage,
+                "Splash/engine.png",
+                900);
+
+            ConfigureSplashImage(
+                StudioSplashImage,
+                "Splash/studio.png",
+                700);
+        }
+
+        private void ConfigureSplashImage(
+            System.Windows.Controls.Image image,
+            string resourcePath,
+            int decodePixelWidth)
+        {
+            try
+            {
+                BitmapImage bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(
+                    "pack://application:,,,/" + resourcePath,
+                    UriKind.Absolute);
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.DecodePixelWidth = decodePixelWidth;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                image.Source = bitmap;
+            }
+            catch
+            {
+            }
         }
 
         // =========================================================
