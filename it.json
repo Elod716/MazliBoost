@@ -71,5 +71,17 @@
   "saveAndClose": "Sì, salva e chiudi",
   "discardAndClose": "Ignora e chiudi",
   "settingsSaveFailed": "MázliBoost non ha potuto salvare settings.json. Verifica che la cartella dell’applicazione sia scrivibile.",
-  "error": "Errore"
+  "error": "Errore",
+  "hags": "Pianificazione GPU con accelerazione hardware",
+  "hagsDescription": "Modifica il comportamento della pianificazione GPU. È richiesto un riavvio.",
+  "globalPowerThrottling": "Disabilita il Power Throttling globale",
+  "globalPowerThrottlingDescription": "Disabilita il Power Throttling di Windows a livello di sistema. Sono richiesti i diritti di amministratore.",
+  "aeroPeek": "Disabilita Aero Peek",
+  "aeroPeekDescription": "Modifica l’aspetto di Windows - Ripristinabile deselezionando.",
+  "cursorShadow": "Disabilita l’ombra del cursore",
+  "cursorShadowDescription": "Modifica l’aspetto di Windows - Ripristinabile deselezionando.",
+  "smoothScroll": "Disabilita gli effetti di scorrimento fluido",
+  "smoothScrollDescription": "Non viene modificato alcun interruttore Windows affidabile per lo scorrimento fluido a livello di sistema.",
+  "restartRequired": "Riavvia Windows affinché la modifica abbia effetto.",
+  "adminRequired": "Per questo tweak sono richiesti i diritti di amministratore."
 }

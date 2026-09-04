@@ -7,8 +7,8 @@ namespace MazliBoost
     public sealed class AppSettings
     {
         public string Language { get; set; } = "English";
-        public MainOptimizationSettings MainOptimizations { get; set; } = new MainOptimizationSettings();
-        public MoreTweakSettings MoreTweaks { get; set; } = new MoreTweakSettings();
+        public MainOptimizationSettings MainOptimizations { get; set; } = new();
+        public MoreTweakSettings MoreTweaks { get; set; } = new();
     }
 
     public sealed class MainOptimizationSettings
@@ -24,22 +24,27 @@ namespace MazliBoost
 
     public sealed class MoreTweakSettings
     {
-        public bool VisualEffects { get; set; } = false;
-        public bool Transparency { get; set; } = false;
-        public bool MenuDelay { get; set; } = false;
-        public bool MouseHover { get; set; } = false;
-        public bool GameMode { get; set; } = false;
-        public bool GameDvr { get; set; } = false;
-        public bool HighPerformance { get; set; } = false;
-        public bool StartupDelay { get; set; } = false;
-        public bool WindowAnimations { get; set; } = false;
-        public bool TaskbarAnimations { get; set; } = false;
-        public bool ExplorerThumbnails { get; set; } = false;
+        public bool VisualEffects { get; set; }
+        public bool Transparency { get; set; }
+        public bool MenuDelay { get; set; }
+        public bool MouseHover { get; set; }
+        public bool GameMode { get; set; }
+        public bool GameDvr { get; set; }
+        public bool HighPerformance { get; set; }
+        public bool Hags { get; set; }
+        public bool GlobalPowerThrottling { get; set; }
+        public bool StartupDelay { get; set; }
+        public bool WindowAnimations { get; set; }
+        public bool TaskbarAnimations { get; set; }
+        public bool ExplorerThumbnails { get; set; }
+        public bool AeroPeek { get; set; }
+        public bool CursorShadow { get; set; }
+        public bool SmoothScroll { get; set; }
     }
 
     public static class SettingsLoader
     {
-        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+        private static readonly JsonSerializerOptions JsonOptions = new()
         {
             WriteIndented = true,
             PropertyNameCaseInsensitive = true
@@ -56,7 +61,8 @@ namespace MazliBoost
                     return new AppSettings();
 
                 string json = File.ReadAllText(SettingsPath);
-                AppSettings? loaded = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
+                AppSettings? loaded =
+                    JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
 
                 if (loaded == null)
                     return new AppSettings();
@@ -77,20 +83,24 @@ namespace MazliBoost
 
         public static bool Save(AppSettings settings)
         {
+            string tempPath = SettingsPath + ".tmp";
+
             try
             {
                 string directory = AppContext.BaseDirectory;
                 Directory.CreateDirectory(directory);
 
-                string tempPath = SettingsPath + ".tmp";
                 string json = JsonSerializer.Serialize(settings, JsonOptions);
-
                 File.WriteAllText(tempPath, json);
 
                 if (File.Exists(SettingsPath))
+                {
                     File.Replace(tempPath, SettingsPath, null);
+                }
                 else
+                {
                     File.Move(tempPath, SettingsPath);
+                }
 
                 return true;
             }
@@ -98,7 +108,6 @@ namespace MazliBoost
             {
                 try
                 {
-                    string tempPath = SettingsPath + ".tmp";
                     if (File.Exists(tempPath))
                         File.Delete(tempPath);
                 }

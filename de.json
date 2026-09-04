@@ -71,5 +71,17 @@
   "saveAndClose": "Ja, speichern und schließen",
   "discardAndClose": "Verwerfen und schließen",
   "settingsSaveFailed": "MázliBoost konnte settings.json nicht speichern. Prüfe, ob der Anwendungsordner beschreibbar ist.",
-  "error": "Fehler"
+  "error": "Fehler",
+  "hags": "Hardwarebeschleunigte GPU-Planung",
+  "hagsDescription": "Ändert die GPU-Planung. Ein Neustart ist erforderlich.",
+  "globalPowerThrottling": "Globales Power Throttling deaktivieren",
+  "globalPowerThrottlingDescription": "Deaktiviert das Windows-Power-Throttling systemweit. Administratorrechte erforderlich.",
+  "aeroPeek": "Aero Peek deaktivieren",
+  "aeroPeekDescription": "Ändert das Erscheinungsbild von Windows – durch Abwählen rückgängig machbar.",
+  "cursorShadow": "Mausschatten deaktivieren",
+  "cursorShadowDescription": "Ändert das Erscheinungsbild von Windows – durch Abwählen rückgängig machbar.",
+  "smoothScroll": "Smooth-Scroll-Effekte deaktivieren",
+  "smoothScrollDescription": "Es wird kein unzuverlässiger systemweiter Windows-Schalter geändert.",
+  "restartRequired": "Bitte starte Windows neu, damit diese Änderung wirksam wird.",
+  "adminRequired": "Für diesen Tweak sind Administratorrechte erforderlich."
 }

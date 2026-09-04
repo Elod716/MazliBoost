@@ -71,5 +71,17 @@
   "saveAndClose": "Sim, guardar e fechar",
   "discardAndClose": "Descartar e fechar",
   "settingsSaveFailed": "O MázliBoost não conseguiu guardar o settings.json. Verifica se a pasta da aplicação permite escrita.",
-  "error": "Erro"
+  "error": "Erro",
+  "hags": "Agendamento de GPU acelerado por hardware",
+  "hagsDescription": "Altera o comportamento do agendamento da GPU. É necessário reiniciar.",
+  "globalPowerThrottling": "Desativar Power Throttling global",
+  "globalPowerThrottlingDescription": "Desativa o Power Throttling do Windows em todo o sistema. São necessários privilégios de administrador.",
+  "aeroPeek": "Desativar Aero Peek",
+  "aeroPeekDescription": "Altera a aparência do Windows - Reversível ao desmarcar.",
+  "cursorShadow": "Desativar sombra do cursor",
+  "cursorShadowDescription": "Altera a aparência do Windows - Reversível ao desmarcar.",
+  "smoothScroll": "Desativar efeitos de rolagem suave",
+  "smoothScrollDescription": "Não é alterado nenhum interruptor fiável de rolagem suave a nível de todo o sistema.",
+  "restartRequired": "Reinicie o Windows para que esta alteração tenha efeito.",
+  "adminRequired": "Este ajuste requer privilégios de administrador."
 }

@@ -71,5 +71,17 @@
   "saveAndClose": "Sí, guardar y cerrar",
   "discardAndClose": "Descartar y cerrar",
   "settingsSaveFailed": "MázliBoost no pudo guardar settings.json. Comprueba que la carpeta de la aplicación tenga permisos de escritura.",
-  "error": "Error"
+  "error": "Error",
+  "hags": "Programación de GPU acelerada por hardware",
+  "hagsDescription": "Cambia el comportamiento de la programación de la GPU. Requiere reinicio.",
+  "globalPowerThrottling": "Desactivar Power Throttling global",
+  "globalPowerThrottlingDescription": "Desactiva Power Throttling de Windows en todo el sistema. Se requieren permisos de administrador.",
+  "aeroPeek": "Desactivar Aero Peek",
+  "aeroPeekDescription": "Cambia la apariencia de Windows - Se puede revertir al desmarcar.",
+  "cursorShadow": "Desactivar sombra del cursor",
+  "cursorShadowDescription": "Cambia la apariencia de Windows - Se puede revertir al desmarcar.",
+  "smoothScroll": "Desactivar efectos de desplazamiento suave",
+  "smoothScrollDescription": "No se modifica ningún interruptor fiable de desplazamiento suave a nivel de todo el sistema.",
+  "restartRequired": "Reinicia Windows para que este cambio tenga efecto.",
+  "adminRequired": "Este ajuste requiere permisos de administrador."
 }

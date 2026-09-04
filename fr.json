@@ -71,5 +71,17 @@
   "saveAndClose": "Oui, enregistrer et fermer",
   "discardAndClose": "Ignorer et fermer",
   "settingsSaveFailed": "MázliBoost n’a pas pu enregistrer settings.json. Vérifiez que le dossier de l’application est accessible en écriture.",
-  "error": "Erreur"
+  "error": "Erreur",
+  "hags": "Planification GPU accélérée par le matériel",
+  "hagsDescription": "Modifie le comportement de la planification GPU. Redémarrage requis.",
+  "globalPowerThrottling": "Désactiver le Power Throttling global",
+  "globalPowerThrottlingDescription": "Désactive le Power Throttling de Windows à l’échelle du système. Des droits administrateur sont requis.",
+  "aeroPeek": "Désactiver Aero Peek",
+  "aeroPeekDescription": "Modifie l’apparence de Windows - Réversible en décochant.",
+  "cursorShadow": "Désactiver l’ombre du curseur",
+  "cursorShadowDescription": "Modifie l’apparence de Windows - Réversible en décochant.",
+  "smoothScroll": "Désactiver les effets de défilement fluide",
+  "smoothScrollDescription": "Aucun commutateur Windows système fiable de défilement fluide n’est modifié.",
+  "restartRequired": "Redémarrez Windows pour appliquer cette modification.",
+  "adminRequired": "Les droits administrateur sont requis pour ce réglage."
 }

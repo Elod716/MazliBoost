@@ -71,5 +71,17 @@
   "saveAndClose": "Yes and close",
   "discardAndClose": "Discard and close",
   "settingsSaveFailed": "MázliBoost could not save settings.json. Check that the application folder is writable.",
-  "error": "Error"
+  "error": "Error",
+  "hags": "Hardware-Accelerated GPU Scheduling",
+  "hagsDescription": "Changes GPU scheduling behavior. Requires a restart.",
+  "globalPowerThrottling": "Disable Global Power Throttling",
+  "globalPowerThrottlingDescription": "Disables Windows power throttling system-wide. Requires administrator rights.",
+  "aeroPeek": "Disable Aero Peek",
+  "aeroPeekDescription": "Changes Windows appearance - Revertable by unchecking.",
+  "cursorShadow": "Disable Cursor Shadow",
+  "cursorShadowDescription": "Changes Windows appearance - Revertable by unchecking.",
+  "smoothScroll": "Disable Smooth-Scroll Effects",
+  "smoothScrollDescription": "No reliable system-wide Windows switch is changed by this option.",
+  "restartRequired": "Please restart Windows for this change to take effect.",
+  "adminRequired": "Administrator rights are required for this tweak."
 }

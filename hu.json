@@ -71,5 +71,17 @@
   "saveAndClose": "Igen, mentés és kilépés",
   "discardAndClose": "Elvetés és kilépés",
   "settingsSaveFailed": "A MázliBoost nem tudta elmenteni a settings.json fájlt. Ellenőrizd, hogy az alkalmazás mappája írható-e.",
-  "error": "Hiba"
+  "error": "Hiba",
+  "hags": "Hardveresen gyorsított GPU-ütemezés",
+  "hagsDescription": "Megváltoztatja a GPU-ütemezés működését. Újraindítás szükséges.",
+  "globalPowerThrottling": "Globális Power Throttling kikapcsolása",
+  "globalPowerThrottlingDescription": "Kikapcsolja a Windows rendszer szintű Power Throttling funkcióját. Rendszergazdai jogosultság szükséges.",
+  "aeroPeek": "Aero Peek kikapcsolása",
+  "aeroPeekDescription": "Megváltoztatja a Windows megjelenését – a kikapcsolással visszaállítható.",
+  "cursorShadow": "Egérkurzor árnyékának kikapcsolása",
+  "cursorShadowDescription": "Megváltoztatja a Windows megjelenését – a kikapcsolással visszaállítható.",
+  "smoothScroll": "Sima görgetési effektek kikapcsolása",
+  "smoothScrollDescription": "Ehhez nincs megbízható, rendszer-szintű Windows kapcsoló, ezért ez a beállítás nem módosítja a rendszert.",
+  "restartRequired": "A módosítás érvényesítéséhez indítsd újra a Windowst.",
+  "adminRequired": "Ehhez a tweakeléshez rendszergazdai jogosultság szükséges."
 }
